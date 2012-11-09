@@ -89,14 +89,15 @@ pair <double, double> Boundry_Angle (Unit &self, Unit &target)
 	double width = target.width();
 	double height = target.height();
 	double angle_vertex = atan (height/width);
+	double dist = sqrt (pow(height/2, 2) + pow(width/2, 2));
 	//double angle = self.GetAngleTo (target);
-	pair <double, double> left_front	(target.x() + width/2*cos(angle_target + angle_vertex), target.y() + height/2*sin(angle_target + angle_vertex));
+	pair <double, double> left_front	(target.x() + dist*cos(angle_target + angle_vertex), target.y() + dist*sin(angle_target + angle_vertex));
 	angle_vertex = -angle_vertex;
-	pair <double, double> right_front	(target.x() + width/2*cos(angle_target + angle_vertex), target.y() + height/2*sin(angle_target + angle_vertex));
+	pair <double, double> right_front	(target.x() + dist*cos(angle_target + angle_vertex), target.y() + dist*sin(angle_target + angle_vertex));
 	angle_vertex = angle_vertex + M_PI;
-	pair <double, double> left_rear		(target.x() + width/2*cos(angle_target + angle_vertex), target.y() + height/2*sin(angle_target + angle_vertex));
+	pair <double, double> left_rear		(target.x() + dist*cos(angle_target + angle_vertex), target.y() + dist*sin(angle_target + angle_vertex));
 	angle_vertex = -angle_vertex;
-	pair <double, double> right_rear	(target.x() + width/2*cos(angle_target + angle_vertex), target.y() + height/2*sin(angle_target + angle_vertex));
+	pair <double, double> right_rear	(target.x() + dist*cos(angle_target + angle_vertex), target.y() + dist*sin(angle_target + angle_vertex));
 	double angle_left_front =	self.GetAngleTo (left_front.first, left_front.second);
 	double angle_right_front =	self.GetAngleTo (right_front.first, right_front.second);
 	double angle_left_rear =	self.GetAngleTo (left_rear.first, left_rear.second);
@@ -481,18 +482,30 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 				break;
 			}
 		}
+		double dist = self.GetDistanceTo (bonuses[i]);
+		double angle = self.GetAngleTo (bonuses[i]);
+		size_t closer_enemies = 0;
+		for (size_t j = 0; j < EnemiesToAttack.size(); ++j)
+		{
+			if (dist > EnemiesToAttack[j].GetDistanceTo (bonuses[i]))
+				++closer_enemies;
+			if (angle > EnemiesToAttack[j].GetAngleTo (bonuses[i]) && dist > EnemiesToAttack[j].GetDistanceTo (bonuses[i]))
+				++closer_enemies;
+		}
+		//if (closer_enemies)
+			//measure /= closer_enemies;
 		if (measure > measure_goal)
 		{
 			goal_num_in_bonuses_array = i;
 			measure_goal = measure;
 		}
 	}
-	if (goal_num_in_bonuses_array < bonuses.size() && (measure_health >= 0.5 || measure_shield >= 0.4))
-	{
-		Bonus bonus_goal = bonuses[goal_num_in_bonuses_array];
-		GoTo (move, self.GetAngleTo (bonus_goal));
-		return;
-	}
+	//if (goal_num_in_bonuses_array < bonuses.size() && (measure_health >= 0.5 || measure_shield >= 0.4))
+	//{
+	//	Bonus bonus_goal = bonuses[goal_num_in_bonuses_array];
+	//	//GoTo (move, self.GetAngleTo (bonus_goal));
+	//	//return;
+	//}
 
 	if (goal_num_in_bonuses_array < bonuses.size())
 	{
@@ -505,7 +518,7 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 		{
 			double dist = shells[i].GetDistanceTo(self);
 			double angle = fabs(shells[i].GetAngleTo (self));
-			if (angle >= M_PI/2 || dist <= self.width()/2)
+			if (angle >= M_PI/2/* || dist <= self.width()/2*/)
 				continue;
 			if (angle > max_angle_shells)
 				max_angle_shells = angle;
@@ -548,6 +561,8 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 				}
 				if (Cover_Angle (MyBoundry, pair <double, double> (shells[i].angle(), shells[i].angle())))
 					measure = 0.9 * (1 - pow (0.8 * dist / max_dist_shells, 0.9)) * (1 - pow (0.8 * angle / max_angle_shells, 0.4));
+				else
+					continue;
 				if (barriers > 0)
 					measure /= barriers;
 				if (measure > danger_measure)
