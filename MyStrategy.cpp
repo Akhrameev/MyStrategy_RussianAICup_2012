@@ -244,6 +244,22 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 		if ((all_tanks[i].id() != self.id()) && (all_tanks[i].crew_health()) && (all_tanks[i].hull_durability()) && (!all_tanks[i].teammate()) && (!(all_tanks[i].player_name() == "EmptyPlayer")) && (!(all_tanks[i].player_name().substr (0,9) == "Akhrameev")))
 			EnemiesToAttack.push_back (i);
 	}
+	if (EnemiesToAttack.size() == 0)
+	{
+		for (size_t i = 0; i < all_tanks.size(); ++i)
+		{
+			if ((all_tanks[i].id() != self.id()) && (all_tanks[i].crew_health()) && (all_tanks[i].hull_durability()) && (!all_tanks[i].teammate()) && (!(all_tanks[i].player_name().substr (0,9) == "Akhrameev")))
+				EnemiesToAttack.push_back (i);
+		}
+	}
+	if (EnemiesToAttack.size() == 0)
+	{
+		for (size_t i = 0; i < all_tanks.size(); ++i)
+		{
+			if ((all_tanks[i].id() != self.id()) && (all_tanks[i].crew_health()) && (all_tanks[i].hull_durability()) && (!all_tanks[i].teammate()))
+				EnemiesToAttack.push_back (i);
+		}
+	}
 	for (size_t i = 0; i < all_tanks.size(); ++i)
 	{
 		double dist = self.GetDistanceTo (all_tanks[i]);
@@ -336,8 +352,11 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 		{
 			move.set_turret_turn (-self.turret_turn_speed());
 		}
-		if (double (self.remaining_reloading_time()) / self.reloading_time() < 0.05)
-			fire_on = true;
+		if ((double (self.remaining_reloading_time()) / self.reloading_time() < 0.05) && (abs (angle) <= HELP_FIRING_ANGLE) && (abs (angle) >= MIN_FIRING_ANGLE))
+		{
+
+			//fire_on = true;
+		}
 	}
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
