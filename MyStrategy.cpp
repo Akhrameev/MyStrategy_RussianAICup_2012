@@ -489,7 +489,7 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 									++barriers;
 							}
 						}
-						if (!barriers && dist <= world.height()/2)
+						if (!barriers && dist <= world.height()/2 && self.premium_shell_count() > 0)
 							move.set_fire_type (PREMIUM_PREFERRED);
 						else if (barriers < Barrier.size())
 							move.set_fire_type (REGULAR_FIRE);
@@ -600,13 +600,13 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 		size_t closer_enemies = 0;
 		for (size_t j = 0; j < EnemiesToAttack.size(); ++j)
 		{
-			if (dist > EnemiesToAttack[j].GetDistanceTo (bonuses[i]))
+			if (dist > 0.3 * EnemiesToAttack[j].GetDistanceTo (bonuses[i]))
 				++closer_enemies;
-			if (angle > EnemiesToAttack[j].GetAngleTo (bonuses[i]) && dist > EnemiesToAttack[j].GetDistanceTo (bonuses[i]))
+			if (angle > EnemiesToAttack[j].GetAngleTo (bonuses[i]) && dist > 0.3 * EnemiesToAttack[j].GetDistanceTo (bonuses[i]))
 				++closer_enemies;
 		}
-		//if (closer_enemies)
-			//measure /= closer_enemies;
+		if (closer_enemies)
+			measure /= closer_enemies;
 		if (measure > measure_goal)
 		{
 			goal_num_in_bonuses_array = i;
