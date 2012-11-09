@@ -368,6 +368,29 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 	///////////////////////////////////////MOVING/////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
+	if (world.tick() < self.reloading_time() - 10)
+	{
+		double dist_tl = self.GetDistanceTo (0,					0);
+		double dist_tr = self.GetDistanceTo (world.width(),		0);
+		double dist_br = self.GetDistanceTo (world.width(),		world.height());
+		double dist_bl = self.GetDistanceTo (0,					world.height());
+		if (min (dist_tl, dist_tr) < min (dist_bl, dist_br))
+		{
+			if (min (dist_tl, dist_bl) < min (dist_tr, dist_br))
+				GoTo (move, self.GetAngleTo (0, 0));
+			else
+				GoTo (move, self.GetAngleTo (0, world.height()));
+		}
+		else
+		{
+			if (min (dist_tl, dist_bl) < min (dist_tr, dist_br))
+				GoTo (move, self.GetAngleTo (world.width(), 0));
+			else
+				GoTo (move, self.GetAngleTo (world.width(), world.height()));
+		}
+		fire_on = true;
+	}
+
 	if (!fire_on)
 	{
 		if (Measure_health > 1 || Measure_hull > 1)
