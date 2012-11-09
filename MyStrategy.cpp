@@ -83,7 +83,9 @@ double short_angle (double angle, double left = 0, double right = 0.1)
 		return right;
 	if (!angle)
 		return right;
-	return left + min_angle_alive / angle / (right - left);
+	if (left == right)
+		return right;
+	return left + angle / min_angle_alive / (right - left);
 }
 
 double MeasureEnemy_ToAtack (Tank *self, World *world, Tank *enemy)
@@ -95,6 +97,8 @@ double MeasureEnemy_ToAtack (Tank *self, World *world, Tank *enemy)
 	double measure = dist * sin (angle);
 	double height = enemy->height();
 	double width = enemy->width();
+	if (dist == 0)
+		return 0;
 	if ((measure <= width/2) && (dist <= height))
 		return 1;
 	if (measure <= height/2 && dist <= 4 *height)
@@ -102,11 +106,15 @@ double MeasureEnemy_ToAtack (Tank *self, World *world, Tank *enemy)
 	if (measure <= height && dist <= 4 *height)
 		return (0.7 + short_angle(angle));
 	double health_prefer = 0.5;
-	if (enemy->crew_health() < 25 || enemy->hull_durability() < 25)
+	if (enemy->crew_health() <= 25 || enemy->hull_durability() <= 25)
 		health_prefer = 1;
 	else
 		health_prefer *= pow (double (enemy->crew_health()) / enemy->crew_max_health(), 3) * pow (double (enemy->hull_durability()) / enemy->hull_max_durability(), 2);
-	return health_prefer * pow (max_dist_alive / dist / 0.7, 2) * pow (min_angle_alive / angle / 0.7, 3);
+	if (angle == 0)
+		return 1;
+	if (!min_angle_alive)
+		return 0;
+	return health_prefer * pow (max_dist_alive / dist / 0.7, 2) * pow (angle / min_angle_alive / 0.7, 3);
 }
 
 double MeasureShell_Defend (Tank *self, World *world, Shell *bullet)
@@ -136,7 +144,13 @@ double MeasureShell_Defend (Tank *self, World *world, Shell *bullet)
 		return (0.7 + short_angle(angle));
 	if (measure >= 2 * height)
 		return 0;
-	return pow (max_dist_shells / dist / 0.7, 2) * pow (min_angle_alive / angle / 0.7, 3);
+	if (!dist)
+		return 0;
+	if (!angle)
+		return 1;
+	if (!min_angle_alive)
+		return 0;
+	return pow (max_dist_shells / dist / 0.7, 2) * pow (angle / min_angle_alive / 0.7, 3);
 }
 
 double MeasureEnemy_Defend (Tank *self, World *world, Tank *enemy)
@@ -156,7 +170,13 @@ double MeasureEnemy_Defend (Tank *self, World *world, Tank *enemy)
 		return (0.7 + short_angle(angle));
 	if (measure >= 2 * height)
 		return 0;
-	return pow (max_dist_alive / dist / 0.7, 3) * pow (min_angle_alive / angle / 0.7, 2);
+	if (!dist)
+		return 0;
+	if (!angle)
+		return 1;
+	if (!min_angle_alive)
+		return 0;
+	return pow (max_dist_alive / dist / 0.7, 3) * pow (angle / min_angle_alive / 0.7, 2);
 }
 
 double MeasureSelf_Health (Tank *self, World *world)
@@ -188,7 +208,7 @@ double MeasureSelf_Ammo (Tank *self, World *world)
 	if (!self || !world)
 		return 0;
 	double ammo = self->premium_shell_count();
-	if (!ammo)
+	if (ammo == 0)
 		return 0.3;
 	return 0.3 / ammo;
 }
@@ -223,7 +243,7 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 		}
 	}
 	max_dist_alive = 0;
-	min_angle_alive = 10;
+	min_angle_alive = M_PI;
 	for (size_t i = 0; i < all_tanks.size(); ++i)
 	{
 		double dist = self.GetDistanceTo (all_tanks[i]);
@@ -231,7 +251,11 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 			max_dist_alive = dist;
 		double angle = fabs (self.GetAngleTo (all_tanks[i]));
 		if (angle < min_angle_alive && all_tanks[i].crew_health() && all_tanks[i].hull_durability())	//если угол меньший, и он живой
+		{
 			min_angle_alive = angle;
+			if (angle == 0)
+				min_angle_alive = 0.00000001;
+		}
 	}
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
