@@ -358,17 +358,17 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 		{
 		case MEDIKIT:
 			{
-				measure = measure_health * pow (max_bonus_dist_health / bonuses[i].GetDistanceTo (self), 1.7);
+				measure = measure_health * pow (max_bonus_dist_health / bonuses[i].GetDistanceTo (self), 1.1);
 				break;
 			}
 		case REPAIR_KIT:
 			{
-				measure = measure_shield * pow (max_bonus_dist_shield / bonuses[i].GetDistanceTo (self), 1.5);
+				measure = measure_shield * pow (max_bonus_dist_shield / bonuses[i].GetDistanceTo (self), 1.3);
 				break;
 			}
 		case AMMO_CRATE:
 			{
-				measure = measure_ammo * pow (max_bonus_dist_ammo / bonuses[i].GetDistanceTo (self), 1.1);
+				measure = measure_ammo * pow (max_bonus_dist_ammo / bonuses[i].GetDistanceTo (self), 1.8);
 				break;
 			}
 		default:
@@ -383,7 +383,7 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 			measure_goal = measure;
 		}
 	}
-	if (measure_health >= 0.5 || measure_shield >= 0.4)
+	if (goal && measure_health >= 0.5 || measure_shield >= 0.4)
 	{
 		GoTo (move, self.GetAngleTo (*goal));
 		return;
