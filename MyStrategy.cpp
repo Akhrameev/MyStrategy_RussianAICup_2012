@@ -62,6 +62,8 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 	if (CurrentEnemy >= 0)
 	{
 		Tank aim = all_tanks[CurrentEnemy];
+		enemy_name = aim.player_name();
+		enemy_id = aim.id();
 		double turret_angle_to = self.GetTurretAngleTo (aim);
 		if (abs (turret_angle_to) >= MIN_FIRING_ANGLE)
 		{	//не буду шмалять, буду крутить пушку
