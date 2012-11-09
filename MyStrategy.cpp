@@ -60,21 +60,21 @@ bool GoFrom (model::Move& move, double angle, double angle_to_go = 0)
 	if (right > 0 && front > 0)
 	{
 		move.set_left_track_power  (-1.0);
-		move.set_right_track_power (-0.2);
+		move.set_right_track_power (0.2);
 	}
 	else if (right > 0 && front < 0)
 	{
 		move.set_left_track_power  (1.0);
-		move.set_right_track_power (0.2);
+		move.set_right_track_power (-0.2);
 	}
 	else if (right < 0 && front < 0)
 	{
-		move.set_left_track_power  (0.2);
+		move.set_left_track_power  (-0.2);
 		move.set_right_track_power (1.0);
 	}
 	else if (right < 0 && front > 0)
 	{
-		move.set_left_track_power  (-0.2);
+		move.set_left_track_power  (0.2);
 		move.set_right_track_power (-1.0);
 	}
 	if (0 == front)
@@ -354,8 +354,11 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 		}
 		if ((double (self.remaining_reloading_time()) / self.reloading_time() < 0.05) && (abs (angle) <= HELP_FIRING_ANGLE) && (abs (angle) >= MIN_FIRING_ANGLE))
 		{
-
-			//fire_on = true;
+			double right = 1;
+			if (angle < 0)
+				right = -1;
+			move.set_left_track_power  (right);
+			move.set_right_track_power (-right);
 		}
 	}
 
