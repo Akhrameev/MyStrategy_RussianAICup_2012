@@ -14,7 +14,7 @@ long long enemy_id = -1;
 
 const double MIN_ANGLE = M_PI / 6.0; 
 const double MAX_ANGLE = M_PI; 
-const double MIN_FIRING_ANGLE = M_PI / 72.0; 
+const double MIN_FIRING_ANGLE = M_PI / 90.0; 
 const double MIN_FLEE_ANGLE = M_PI / 6.0;
 
 enum OBJECT {TANK, SHELL, BONUS};
@@ -106,7 +106,7 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 		CurrentEnemy = -1;
 	for (size_t i = 0; i < all_tanks.size(); ++i)
 	{
-		if ((all_tanks[i].id() != self.id()) && (all_tanks[i].angular_speed() || all_tanks[i].speed_x() || all_tanks[i].speed_y()) && (all_tanks[i].crew_health()))
+		if ((all_tanks[i].id() != self.id()) && (all_tanks[i].angular_speed() || all_tanks[i].speed_x() || all_tanks[i].speed_y()) && (all_tanks[i].crew_health()) && (all_tanks[i].hull_durability()))
 			EnemiesToAttack.push_back (i);
 	}
 	double dist_to_currentenemy = 1E20;
