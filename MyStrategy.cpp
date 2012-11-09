@@ -24,7 +24,7 @@ bool GoTo (model::Move& move, double angle)
 	double tangs = tan (angle);
 	if (ftangs <= 1/3 && ftangs >= -1/3)
 	{
-		if (angle >= 0)
+		if (cos (angle) >= 0)
 		{	//еду вперёд
 			move.set_left_track_power  (1.0);
 			move.set_right_track_power (1.0);
@@ -35,7 +35,7 @@ bool GoTo (model::Move& move, double angle)
 			move.set_right_track_power (-1.0);
 		}
 	}
-	else if (tangs < 0)
+	else if (tangs >= 0)
 	{	//поворот направо
 		move.set_left_track_power  (1.0);
 		move.set_right_track_power (-1.0);
@@ -53,7 +53,7 @@ bool GoFrom (model::Move& move, double angle, double angle_to_go = 0)
 	double tangs = tan (angle);
 	if (ftangs >= 2 || ftangs <= -2)
 	{
-		if (angle_to_go >= 0)
+		if (cos (angle_to_go) >= 0)
 		{	//еду вперёд
 			move.set_left_track_power  (1.0);
 			move.set_right_track_power (1.0);
@@ -64,7 +64,7 @@ bool GoFrom (model::Move& move, double angle, double angle_to_go = 0)
 			move.set_right_track_power (-1.0);
 		}
 	}
-	else if (tangs > 0)
+	else if (tangs <= 0)
 	{	//поворот направо
 		move.set_left_track_power  (1.0);
 		move.set_right_track_power (-1.0);
@@ -288,26 +288,27 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 	///////////////////////////////////////MOVING/////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
-	if (world.tick() < self.reloading_time() / 2)
+	if (world.tick() < self.reloading_time() * 0.8)
 	{
 		double dist_tl = self.GetDistanceTo (0,					0);
 		double dist_tr = self.GetDistanceTo (world.width(),		0);
 		double dist_br = self.GetDistanceTo (world.width(),		world.height());
 		double dist_bl = self.GetDistanceTo (0,					world.height());
-		if (min (dist_tl, dist_tr) < min (dist_bl, dist_br))
-		{
-			if (min (dist_tl, dist_bl) < min (dist_tr, dist_br))
-				GoTo (move, self.GetAngleTo (0, 0));
-			else
-				GoTo (move, self.GetAngleTo (0, world.height()));
-		}
-		else
-		{
-			if (min (dist_tl, dist_bl) < min (dist_tr, dist_br))
-				GoTo (move, self.GetAngleTo (world.width(), 0));
-			else
-				GoTo (move, self.GetAngleTo (world.width(), world.height()));
-		}
+		double dist_cl = self.GetDistanceTo (0,					world.height() / 2);
+		double dist_cr = self.GetDistanceTo (world.width(),		world.height() / 2);
+		double min_dist = min (min (min (dist_tl, dist_tr), min (dist_br, dist_bl)), min (dist_cl, dist_cr));
+		if (min_dist == dist_tl)
+			GoTo (move, self.GetAngleTo (0,					0));
+		else if (min_dist == dist_tr)
+			GoTo (move, self.GetAngleTo (world.width(),		0));
+		else if (min_dist == dist_br)
+			GoTo (move, self.GetAngleTo (world.width(),		world.height()));
+		else if (min_dist == dist_bl)
+			GoTo (move, self.GetAngleTo (0,					world.height()));
+		else if (min_dist == dist_cl)
+			GoTo (move, self.GetAngleTo (0,					world.height() / 2));
+		else if (min_dist == dist_cr)
+			GoTo (move, self.GetAngleTo (world.width(),		world.height() / 2));
 		return;
 	}
 
@@ -382,7 +383,12 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 			measure_goal = measure;
 		}
 	}
-	bool move_on = false;
+	if (measure_health >= 0.5 || measure_shield >= 0.4)
+	{
+		GoTo (move, self.GetAngleTo (*goal));
+		return;
+	}
+
 	if (goal)
 	{
 		Shell *danger = NULL;
