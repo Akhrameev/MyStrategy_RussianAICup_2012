@@ -22,7 +22,7 @@ bool GoTo (model::Move& move, double angle)
 {
 	double ftangs = tan (fabs (angle));
 	double tangs = tan (angle);
-	if (ftangs <= 1/3 && ftangs >= -1/3)
+	if (ftangs <= 2/3 && ftangs >= -2/3)
 	{
 		if (cos (angle) >= 0)
 		{	//еду вперёд
@@ -51,7 +51,7 @@ bool GoFrom (model::Move& move, double angle, double angle_to_go = 0)
 {
 	double ftangs = tan (fabs (angle));
 	double tangs = tan (angle);
-	if (ftangs >= 2 || ftangs <= -2)
+	if (ftangs >= 1.5 || ftangs <= -1.5)
 	{
 		if (cos (angle_to_go) >= 0)
 		{	//еду вперёд
