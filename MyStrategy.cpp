@@ -119,7 +119,7 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 	//////////////////////////////////////////////////////////////////////////////////////////////
 	///////////////////////////////////////FIRING/////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////////////////
-	
+	/*
 	//Tank *enemy = NULL;
 	size_t tank_num_in_enemies_array = EnemiesToAttack.size();
 	double measure_enemy = 0;
@@ -162,7 +162,7 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 			}
 		}
 	}
-	if (/*enemy && */tank_num_in_enemies_array != EnemiesToAttack.size())
+	if (tank_num_in_enemies_array != EnemiesToAttack.size())
 	{		//определил врага
 		Tank enemy_object = EnemiesToAttack[tank_num_in_enemies_array];//*enemy;
 		if (self.remaining_reloading_time () / self.reloading_time() <= 0.7)	//UP
@@ -194,7 +194,7 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 			//		fire_on = true;
 			//}
 		}
-	}
+	}*/
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 	///////////////////////////////////////MOVING/////////////////////////////////////////////////
