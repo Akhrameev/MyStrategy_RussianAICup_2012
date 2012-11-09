@@ -221,6 +221,77 @@ double MeasureSelf_Ammo (Tank &self, World &world)
 	return 0.3 / ammo;
 }
 
+void AvoidShells (model::Move &move, World &world, Tank &self, vector <Tank> &EnemiesToAttack, vector <Unit> &Barrier, pair <double, double> goal)
+{
+	vector <Shell> shells = world.shells();
+	double danger_measure = 0;
+	double max_dist_shells = 0;
+	double max_angle_shells = 0;
+	vector <Shell> shells_danger;
+	for (size_t i = 0; i < shells.size(); ++i)
+	{
+		double dist = shells[i].GetDistanceTo(self);
+		double angle = fabs(shells[i].GetAngleTo (self));
+		if (angle >= M_PI/2/* || dist <= self.width()/2*/)
+			continue;
+		if (angle > max_angle_shells)
+			max_angle_shells = angle;
+		if (dist > max_dist_shells)
+			max_dist_shells = dist;
+		shells_danger.push_back(shells[i]);
+	}
+	size_t danger_num_in_danger_array = shells_danger.size();
+	if (max_angle_shells && max_dist_shells)
+	{
+		for (size_t i = 0; i < shells_danger.size(); ++i)
+		{
+			double measure = 0;
+			//MeasureShell_Defend (&self, &world, &shells[i]);
+			double dist = shells_danger[i].GetDistanceTo(self);
+			double angle = fabs(shells_danger[i].GetAngleTo (self));
+			if (angle >= M_PI/2)
+			{
+				measure = 0;
+				continue;
+			}
+			/*else if (dist * sin(angle) <= self.width()/2)
+				measure = 1;
+			else if (dist * sin(angle) <= self.height())
+				measure = 0.9;
+			else*/
+			pair <double, double> MyBoundry = Boundry_Angle (shells[i], self);
+			size_t barriers = 0;
+			for (size_t j = 0; j < Barrier.size(); ++j)
+			{
+				pair <double, double> barrier_boundry = Boundry_Angle (self, Barrier[j]);
+				if (Cover_Angle (barrier_boundry, MyBoundry))
+				{
+					//бонус или что-то другое полностью закрывает меня
+					barriers += Barrier.size();
+					break;
+				}
+				if (Intersection_Angle (barrier_boundry, MyBoundry))
+					++barriers;
+			}
+			if (Cover_Angle (MyBoundry, pair <double, double> (shells[i].GetAngleTo(self), shells[i].GetAngleTo(self))))
+				measure = 0.9 * (1 - pow (0.8 * dist / max_dist_shells, 0.9)) * (1 - pow (0.8 * angle / max_angle_shells, 0.4));
+			else
+				continue;
+			if (barriers > 0)
+				measure /= barriers;
+			if (measure > danger_measure)
+			{
+				danger_num_in_danger_array = i;
+				danger_measure = measure;
+			}
+		}
+	}
+	if (danger_num_in_danger_array < shells_danger.size() /*&& danger_measure >= MIN_DANGER_LEVEL*/)
+		GoFrom (move, self, self.GetAngleTo (shells_danger[danger_num_in_danger_array]), self.GetAngleTo (goal.first, goal.second));
+	else
+		GoTo (move, self.GetAngleTo (goal.first, goal.second));
+}
+
 void MyStrategy::Move(Tank self, World world, model::Move& move) 
 {
     vector <Tank> all_tanks = world.tanks();
@@ -279,7 +350,6 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 	{
 		for (size_t i = 0; i < EnemiesToAttack.size(); ++i)
 		{
-			//double measure = MeasureEnemy_ToAtack (&self, &world, &(all_tanks[EnemiesToAttack[i]]));
 			Tank enemy_obj = EnemiesToAttack[i];
 			double health_measure = 0;
 			if (enemy_obj.crew_health() != 0)
@@ -359,7 +429,7 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 									++barriers;
 							}
 						}
-						if (!barriers && dist <= world.height()/2)
+						if (!barriers && dist <= world.width()/2)
 							move.set_fire_type (PREMIUM_PREFERRED);
 						else if (barriers < Barrier.size())
 							move.set_fire_type (REGULAR_FIRE);
@@ -417,72 +487,7 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 		else if (min_dist == dist_cr)
 			goal = pair <double, double>	(world.width(),		world.height() / 2);
 			//GoTo (move, self.GetAngleTo (world.width(),		world.height() / 2));
-		double danger_measure = 0;
-		double max_dist_shells = 0;
-		double max_angle_shells = 0;
-		vector <Shell> shells_danger;
-		for (size_t i = 0; i < shells.size(); ++i)
-		{
-			double dist = shells[i].GetDistanceTo(self);
-			double angle = fabs(shells[i].GetAngleTo (self));
-			if (angle >= M_PI/2/* || dist <= self.width()/2*/)
-				continue;
-			if (angle > max_angle_shells)
-				max_angle_shells = angle;
-			if (dist > max_dist_shells)
-				max_dist_shells = dist;
-			shells_danger.push_back(shells[i]);
-		}
-		size_t danger_num_in_danger_array = shells_danger.size();
-		if (max_angle_shells && max_dist_shells)
-		{
-			for (size_t i = 0; i < shells_danger.size(); ++i)
-			{
-				double measure = 0;
-				//MeasureShell_Defend (&self, &world, &shells[i]);
-				double dist = shells_danger[i].GetDistanceTo(self);
-				double angle = fabs(shells_danger[i].GetAngleTo (self));
-				if (angle >= M_PI/2)
-				{
-					measure = 0;
-					continue;
-				}
-				/*else if (dist * sin(angle) <= self.width()/2)
-					measure = 1;
-				else if (dist * sin(angle) <= self.height())
-					measure = 0.9;
-				else*/
-				pair <double, double> MyBoundry = Boundry_Angle (shells[i], self);
-				size_t barriers = 0;
-				for (size_t j = 0; j < Barrier.size(); ++j)
-				{
-					pair <double, double> barrier_boundry = Boundry_Angle (self, Barrier[j]);
-					if (Cover_Angle (barrier_boundry, MyBoundry))
-					{
-						//бонус или что-то другое полностью закрывает меня
-						barriers += Barrier.size();
-						break;
-					}
-					if (Intersection_Angle (barrier_boundry, MyBoundry))
-						++barriers;
-				}
-				if (Cover_Angle (MyBoundry, pair <double, double> (shells[i].GetAngleTo(self), shells[i].GetAngleTo(self))))
-					measure = 0.9 * (1 - pow (0.8 * dist / max_dist_shells, 0.9)) * (1 - pow (0.8 * angle / max_angle_shells, 0.4));
-				else
-					continue;
-				if (barriers > 0)
-					measure /= barriers;
-				if (measure > danger_measure)
-				{
-					danger_num_in_danger_array = i;
-					danger_measure = measure;
-				}
-			}
-		}
-		if (danger_num_in_danger_array < shells_danger.size() /*&& danger_measure >= MIN_DANGER_LEVEL*/)
-			GoFrom (move, self, self.GetAngleTo (shells_danger[danger_num_in_danger_array]), self.GetAngleTo (goal.first, goal.second));
-		else
-			GoTo (move, self.GetAngleTo (goal.first, goal.second));
+		AvoidShells (move, world, self, EnemiesToAttack, Barrier, goal);
 		return;//надо переделать, а то первый снаряд всегда в меня - нужно вставить проверку пуль
 	}
 
@@ -572,85 +577,22 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 			measure_goal = measure;
 		}
 	}
-	//if (goal_num_in_bonuses_array < bonuses.size() && (measure_health >= 0.5 || measure_shield >= 0.4))
-	//{
-	//	Bonus bonus_goal = bonuses[goal_num_in_bonuses_array];
-	//	//GoTo (move, self.GetAngleTo (bonus_goal));
-	//	//return;
-	//}
 
 	if (goal_num_in_bonuses_array < bonuses.size())
 	{
 		Bonus goal_object = bonuses[goal_num_in_bonuses_array];
-		double danger_measure = 0;
-		double max_dist_shells = 0;
-		double max_angle_shells = 0;
-		vector <Shell> shells_danger;
-		for (size_t i = 0; i < shells.size(); ++i)
-		{
-			double dist = shells[i].GetDistanceTo(self);
-			double angle = fabs(shells[i].GetAngleTo (self));
-			if (angle >= M_PI/2/* || dist <= self.width()/2*/)
-				continue;
-			if (angle > max_angle_shells)
-				max_angle_shells = angle;
-			if (dist > max_dist_shells)
-				max_dist_shells = dist;
-			shells_danger.push_back(shells[i]);
-		}
-		size_t danger_num_in_danger_array = shells_danger.size();
-		if (max_angle_shells && max_dist_shells)
-		{
-			for (size_t i = 0; i < shells_danger.size(); ++i)
-			{
-				double measure = 0;
-				//MeasureShell_Defend (&self, &world, &shells[i]);
-				double dist = shells_danger[i].GetDistanceTo(self);
-				double angle = fabs(shells_danger[i].GetAngleTo (self));
-				if (angle >= M_PI/2)
-				{
-					measure = 0;
-					continue;
-				}
-				/*else if (dist * sin(angle) <= self.width()/2)
-					measure = 1;
-				else if (dist * sin(angle) <= self.height())
-					measure = 0.9;
-				else*/
-				pair <double, double> MyBoundry = Boundry_Angle (shells[i], self);
-				size_t barriers = 0;
-				for (size_t j = 0; j < Barrier.size(); ++j)
-				{
-					pair <double, double> barrier_boundry = Boundry_Angle (self, Barrier[j]);
-					if (Cover_Angle (barrier_boundry, MyBoundry))
-					{
-						//бонус или что-то другое полностью закрывает меня
-						barriers += Barrier.size();
-						break;
-					}
-					if (Intersection_Angle (barrier_boundry, MyBoundry))
-						++barriers;
-				}
-				if (Cover_Angle (MyBoundry, pair <double, double> (shells[i].GetAngleTo(self), shells[i].GetAngleTo(self))))
-					measure = 0.9 * (1 - pow (0.8 * dist / max_dist_shells, 0.9)) * (1 - pow (0.8 * angle / max_angle_shells, 0.4));
-				else
-					continue;
-				if (barriers > 0)
-					measure /= barriers;
-				if (measure > danger_measure)
-				{
-					danger_num_in_danger_array = i;
-					danger_measure = measure;
-				}
-			}
-		}
-		if (danger_num_in_danger_array < shells_danger.size() /*&& danger_measure >= MIN_DANGER_LEVEL*/)
-			GoFrom (move, self, self.GetAngleTo (shells_danger[danger_num_in_danger_array]), self.GetAngleTo (goal_object));
-		else
-			GoTo (move, self.GetAngleTo (goal_object));
+		pair <double, double> goal (goal_object.x(), goal_object.y());
+		AvoidShells (move, world, self, EnemiesToAttack, Barrier, goal);
+	}
+	else
+	{
+		//нужна рандомная цель))
+		//pair <double, double> goal (goal_object.x(), goal_object.y());
+		//AvoidShells (move, world, self, EnemiesToAttack, Barrier, goal);
 	}
 }
 
 TankType MyStrategy::SelectTank(int tank_index, int team_size) {
     return MEDIUM;
 }
+
