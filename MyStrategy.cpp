@@ -489,7 +489,7 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 									++barriers;
 							}
 						}
-						if (!barriers && dist <= world.width()/2)
+						if (!barriers && dist <= world.height()/2)
 							move.set_fire_type (PREMIUM_PREFERRED);
 						else if (barriers < Barrier.size())
 							move.set_fire_type (REGULAR_FIRE);
