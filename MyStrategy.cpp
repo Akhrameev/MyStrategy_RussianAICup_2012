@@ -151,8 +151,13 @@ double MeasureIt (MEASURES measure, Tank *self, World *world, Tank *enemy = NULL
 				return ANGLE_POWER / abs (turret_angle) * enemy->GetDistanceTo (*self) / max_dist_alive;
 			double premium_ammo_priority = 1;
 			if (enemy->premium_shell_count())
-				premium_ammo_priority = 10 * enemy->premium_shell_count();
-			return ANGLE_POWER / abs (turret_angle) * enemy->GetDistanceTo (*self) / max_dist_alive * enemy->reloading_time() / enemy->remaining_reloading_time();
+				premium_ammo_priority = enemy->premium_shell_count();
+			double firing_priority = 1;
+			if (enemy->remaining_reloading_time()/ enemy->reloading_time() < 0.1)
+				firing_priority = 10 * premium_ammo_priority * enemy->reloading_time() / enemy->remaining_reloading_time();
+			else if (enemy->remaining_reloading_time()/ enemy->reloading_time() > 0.3)
+				return 0;	//стрельнёт ещё не скоро
+			return firing_priority * ANGLE_POWER / abs (turret_angle) * enemy->GetDistanceTo (*self) / max_dist_alive;
 			break;
 		}
 	case HEALTH_INNEED:
@@ -208,8 +213,10 @@ double MeasureIt (MEASURES measure, Tank *self, World *world, Tank *enemy = NULL
 				counter = 2;
 			if (!(shell->GetAngleTo (*self)) && shell->GetDistanceTo(*self))
 				return 1E20;
-			if (!shell->GetDistanceTo(*self))
+			if (!shell->GetDistanceTo(*self) || abs (shell->GetAngleTo (*self)) >= M_PI / 2)
 				return 0;
+			if (abs (shell->GetAngleTo (*self)) < M_PI / 36)
+				counter *= 3;
 			return counter / abs (shell->GetAngleTo (*self)) / shell->GetDistanceTo (*self) * (world->width());
 		}
 	default:				
