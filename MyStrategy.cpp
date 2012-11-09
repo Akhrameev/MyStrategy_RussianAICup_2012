@@ -107,6 +107,66 @@ pair <double, double> Boundry_Angle (Unit &self, Unit &target)
 	return pair <double, double> (min_angle, max_angle);
 }
 
+pair <double, double> Closest_Corner (World &world, Tank &self)
+{
+	double h = world.height();
+	double w = world.width();
+	pair <double, double> goal;
+	double x = self.x();
+	double y = self.y();
+	if (x <= h/4 && y <= w/3)
+	{
+		goal.first = h/4;
+		goal.second = self.height()/2;
+	}
+	else if (x <= h/2 && y <= w/3)
+	{
+		goal.first = h/2;
+		goal.second = self.height()/2;
+	}
+	else if (x <= 3*h/4 && y <= w/3)
+	{
+		goal.first = 3*h/4;
+		goal.second = self.height()/2;
+	}
+	else if (y <= w/3)
+	{
+		goal.first = h - self.height()/2;
+		goal.second = w/3;
+	}
+	else if (x <= h/2 && y <= 2*w/3)
+	{
+		goal.first = self.height()/2;
+		goal.second = w/3;
+	}
+	else if (y <= 2*w/3)
+	{
+		goal.first = h - self.height()/2;
+		goal.second = 2*w/3;
+	}
+	else if (x <= h/4)
+	{
+		goal.first = self.height()/2;
+		goal.second = 2*w/3;
+	}
+	else if (x <= h/2)
+	{
+		goal.first = h/4;
+		goal.second = w - self.height()/2;
+	}
+	else if (x <= 3*h/4)
+	{
+		goal.first = h/2;
+		goal.second = w - self.height()/2;
+	}
+	else
+	{
+		goal.first = 3*h/3;
+		goal.second = w - self.height()/2;
+	}
+	return goal;
+}
+
 bool GoTo (model::Move& move, double angle)
 {
 	double ftangs = tan (fabs (angle));
@@ -461,34 +521,10 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 
 	if (world.tick() <= self.reloading_time() * 0.8)
 	{
-		double dist_tl = self.GetDistanceTo (0,					0);
-		double dist_tr = self.GetDistanceTo (world.width(),		0);
-		double dist_br = self.GetDistanceTo (world.width(),		world.height());
-		double dist_bl = self.GetDistanceTo (0,					world.height());
-		double dist_cl = self.GetDistanceTo (0,					world.height() / 2);
-		double dist_cr = self.GetDistanceTo (world.width(),		world.height() / 2);
-		double min_dist = min (min (min (dist_tl, dist_tr), min (dist_br, dist_bl)), min (dist_cl, dist_cr));
-		pair <double, double> goal;
-		if (min_dist == dist_tl)
-			goal = pair <double, double>	(0,					0);
-			//GoTo (move, self.GetAngleTo (0,					0));
-		else if (min_dist == dist_tr)
-			goal = pair <double, double>	(world.width(),		0);
-			//GoTo (move, self.GetAngleTo (world.width(),		0));
-		else if (min_dist == dist_br)
-			goal = pair <double, double>	(world.width(),		world.height());
-			//GoTo (move, self.GetAngleTo (world.width(),		world.height()));
-		else if (min_dist == dist_bl)
-			goal = pair <double, double>	(0,					world.height());
-			//GoTo (move, self.GetAngleTo (0,					world.height()));
-		else if (min_dist == dist_cl)
-			goal = pair <double, double>	(0,					world.height() / 2);
-			//GoTo (move, self.GetAngleTo (0,					world.height() / 2));
-		else if (min_dist == dist_cr)
-			goal = pair <double, double>	(world.width(),		world.height() / 2);
-			//GoTo (move, self.GetAngleTo (world.width(),		world.height() / 2));
+		//нужна рандомная цель)) сейчас - ближний угол
+		pair <double, double> goal = Closest_Corner (world, self);
 		AvoidShells (move, world, self, EnemiesToAttack, Barrier, goal);
-		return;//надо переделать, а то первый снаряд всегда в меня - нужно вставить проверку пуль
+		return;
 	}
 
 	size_t goal_num_in_bonuses_array = bonuses.size();
@@ -586,9 +622,9 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 	}
 	else
 	{
-		//нужна рандомная цель))
-		//pair <double, double> goal (goal_object.x(), goal_object.y());
-		//AvoidShells (move, world, self, EnemiesToAttack, Barrier, goal);
+		//нужна рандомная цель)) сейчас - ближний угол
+		pair <double, double> goal = Closest_Corner (world, self);
+		AvoidShells (move, world, self, EnemiesToAttack, Barrier, goal);
 	}
 }
 
