@@ -4,6 +4,8 @@
 #include <cmath>
 #include <vector>
 #include <string>
+#include <cstdlib>
+#include <ctime>
 
 using namespace model;
 using namespace std;
@@ -16,6 +18,28 @@ const double MIN_ANGLE = M_PI / 6.0;
 const double MAX_ANGLE = M_PI; 
 const double MIN_FIRING_ANGLE = M_PI / 90.0; 
 const double MIN_FLEE_ANGLE = M_PI / 6.0;
+
+//Returns a random number in the range (0.0f, 1.0f).
+// 0111 1111 1111 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000
+// seee eeee eeee vvvv vvvv vvvv vvvv vvvv vvvv vvvv vvvv vvvv vvvv vvvv vvvv vvvv
+// sign     = 's'
+// exponent = 'e'
+// value    = 'v'
+double DoubleRand() {
+  typedef unsigned long long uint64;
+  uint64 ret=0;
+  for(int i=0;i<13;i++)ret|=((uint64)(rand()%16)<<i*4);
+  if(ret==0)return(rand()%2?1.0f:0.0f);
+  uint64 retb=ret;
+  unsigned int exp=0x3ff;
+  retb=ret|((uint64)(exp)<<52);
+  double *tmp=(double*)&retb;
+  double retval=*tmp;
+  while(retval>1.0f||retval<0.0f)
+    retval=*(tmp=(double*)&(retb=ret|((uint64)(exp--)<<52)));
+  if(rand()%2)retval-=0.5f;
+  return retval;
+}
 
 enum OBJECT {TANK, SHELL, BONUS};
 
@@ -143,11 +167,11 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 			if (my_tank_angle_to > 0)
 			{
 				move.set_left_track_power (1.0);
-				move.set_right_track_power(-0.5);
+				move.set_right_track_power(-1.0);
 			}
 			else
 			{
-				move.set_left_track_power (-0.5);
+				move.set_left_track_power (-1.0);
 				move.set_right_track_power(1.0);
 			}
 			if (turret_angle_to > 0)
@@ -330,6 +354,20 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 				move.set_left_track_power(1.0);         // ���� ���� �� ������ 30 ��������
 				move.set_right_track_power(1.0);        // ������ ����������� ������ ������ 
 			}
+		}			
+		else
+		{		//не буду собирать бонусы, могу либо от пуль уворачиваться, либо просто кататься рандомно
+			//пока просто покатаюсь рандомно
+			srand ((unsigned) time (NULL));
+			double power_left  = 1.0;
+			double power_right = 1.0;
+			if (rand ())
+				power_left = -power_left;
+			if (rand ())
+				power_right = -power_right;
+
+			move.set_left_track_power  (power_left);
+			move.set_right_track_power (power_right);
 		}
 	}
 
