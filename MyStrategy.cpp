@@ -4,373 +4,344 @@
 #include <cmath>
 #include <vector>
 #include <string>
+#include <cstdlib>
+#include <ctime>
 
 using namespace model;
 using namespace std;
 
-int CurrentEnemy = 0;
-std::string enemy_name = "";
-long long enemy_id = -1;
-
 const double MIN_ANGLE = M_PI / 6.0; 
-const double MAX_ANGLE = M_PI; 
-const double MIN_FIRING_ANGLE = M_PI / 90.0; 
-const double MIN_FLEE_ANGLE = M_PI / 6.0;
+const double MIN_GOTO_ANGLE = M_PI / 12.0;
+const double MIN_FIRING_ANGLE = M_PI / 90.0;
+const double MIN_DANGER_LEVEL = 0.8;
 
-enum OBJECT {TANK, SHELL, BONUS};
-
-class PrevData
+bool GoTo (model::Move& move, double angle)
 {
-public:
-	OBJECT obj;
-	vector <Unit> units;
-};
-
-bool is_aim (Unit dot1, Unit dot2, Unit aim)
+	double ftangs = tan (fabs (angle));
+	double tangs = tan (angle);
+	if (ftangs <= 1/sqrt (3.0) && ftangs >= -1/sqrt (3.0))
+	{
+		if (cos (angle) >= 0)
+		{	//еду вперёд
+			move.set_left_track_power  (1.0);
+			move.set_right_track_power (1.0);
+		}
+		else
+		{	//еду назад
+			move.set_left_track_power  (-1.0);
+			move.set_right_track_power (-1.0);
+		}
+	}
+	else if (tangs >= 0)
+	{	//поворот направо
+		move.set_left_track_power  (1.0);
+		move.set_right_track_power (-1.0);
+	}
+	else
+	{	//поворот налево
+		move.set_left_track_power  (-1.0);
+		move.set_right_track_power (1.0);
+	}
+	return true;
+}
+bool GoFrom (model::Move& move, double angle, double angle_to_go = 0)
 {
-	double x1 = dot1.x(), x2 = dot2.x(), y1 = dot2.y(), y2 = dot2.y();
-	bool center			= ((aim.y() - y1) / (y2 - y1) >= (aim.x() - x1) / (x2 - x1));
-	bool right_up		= ((aim.y() - aim.height() - y1) / (y2 - y1) >= (aim.x() + aim.height() - x1) / (x2 - x1));
-	bool right_down		= ((aim.y() + aim.height() - y1) / (y2 - y1) >= (aim.x() + aim.height() - x1) / (x2 - x1));
-	bool left_up		= ((aim.y() - aim.height() - y1) / (y2 - y1) >= (aim.x() - aim.height() - x1) / (x2 - x1));
-	bool left_down		= ((aim.y() + aim.height() - y1) / (y2 - y1) >= (aim.x() - aim.height() - x1) / (x2 - x1));
-	return (center == right_up == right_down == left_up == left_down);
+	double ftangs = tan (fabs (angle));
+	double tangs = tan (angle);
+	if (ftangs >= sqrt (3.0) || ftangs <= -sqrt (3.0))
+	{
+		if (cos (angle_to_go) >= 0)
+		{	//еду вперёд
+			move.set_left_track_power  (1.0);
+			move.set_right_track_power (1.0);
+		}
+		else
+		{	//еду назад
+			move.set_left_track_power  (-1.0);
+			move.set_right_track_power (-1.0);
+		}
+	}
+	else if (tangs <= 0)
+	{	//поворот направо
+		move.set_left_track_power  (1.0);
+		move.set_right_track_power (-1.0);
+	}
+	else
+	{	//поворот налево
+		move.set_left_track_power  (-1.0);
+		move.set_right_track_power (1.0);
+	}
+	return true;
 }
 
-double line_tan (Unit dot1, Unit dot2)
+double MeasureSelf_Health (Tank &self, World &world)
 {
-	return ((double (dot2.x()) - dot1.x()) / (dot2.y() - double (dot1.y())));
+	double health = self.crew_health() / self.crew_max_health();
+	if (health <= 0.25)
+		return 1;
+	//if (health <= 0.7)
+	//	return 1 - health;
+	return 1 - health;	//сюда бы квадрат
 }
 
-vector <PrevData> PreviousData_Tanks;
-vector <PrevData> PreviousData_Shells;
+double MeasureSelf_Shield (Tank &self, World &world)
+{
+	double shield = self.hull_durability() / self.hull_max_durability();
+	if (self.hull_durability() <= 25)
+		return 1;
+	//if (shield <= 0.5)
+	//	return 1 - shield;
+	return 1 - shield;	//сюда бы квадрат
+}
+
+double MeasureSelf_Ammo (Tank &self, World &world)
+{
+	double ammo = self.premium_shell_count();
+	if (ammo == 0)
+		return 0.3;
+	return 0.3 / ammo;
+}
 
 void MyStrategy::Move(Tank self, World world, model::Move& move) 
 {
 	vector <Tank> all_tanks = world.tanks();
-	for (size_t i = 0; i < all_tanks.size(); ++i)
-	{
-		bool unit_placed = false;
-		for (size_t j = 0; j < PreviousData_Tanks.size(); ++j)
-		{
-			if ((PreviousData_Tanks [j].obj == TANK) && (PreviousData_Tanks[j].units[0].id() == all_tanks[i].id()))
-			{
-				PreviousData_Tanks[j].units.push_back (all_tanks[i]);
-				unit_placed = true;
-				break;
-			}
-		}
-		if (!unit_placed)
-		{
-			PrevData prev;
-			prev.obj = TANK;
-			prev.units.push_back (all_tanks[i]);
-			PreviousData_Tanks.push_back (prev);
-		}
-	}
 	vector <Shell> shells = world.shells();
-	for (size_t i = 0; i < shells.size(); ++i)
-	{
-		if (shells[i].id() == self.id())
-			continue;
-		bool unit_placed = false;
-		for (size_t j = 0; j < PreviousData_Shells.size(); ++j)
-		{
-			if ((PreviousData_Shells [j].obj == SHELL) && (PreviousData_Shells[j].units[0].id() == shells[i].id()))
-			{
-				PreviousData_Shells[j].units.push_back (shells[i]);
-				unit_placed = true;
-				break;
-			}
-		}
-		if (!unit_placed)
-		{
-			PrevData prev;
-			prev.obj = SHELL;
-			prev.units.push_back (shells[i]);
-			PreviousData_Shells.push_back (prev);
-		}
-	}
+	vector <Bonus> bonuses = world.bonuses();
 	move.set_fire_type(NONE);
-	vector <int> EnemiesToAttack;
-	CurrentEnemy = -1;
-	for (size_t i = 0; i < all_tanks.size(); ++i)
-		if (all_tanks[i].player_name() == enemy_name)
-		{
-			if ((CurrentEnemy < 0) && (all_tanks[i].id() == enemy_id))
-				CurrentEnemy = i;
-			if (CurrentEnemy < 0)
-				CurrentEnemy = i;
-		}
-	if (CurrentEnemy >= 0 && !all_tanks[CurrentEnemy].crew_health())
-		CurrentEnemy = -1;
+	vector <Tank> EnemiesToAttack;
+	//заполнение массива живых врагов. + вычисление max_dist_alive
 	for (size_t i = 0; i < all_tanks.size(); ++i)
 	{
-		if ((all_tanks[i].id() != self.id()) && (all_tanks[i].angular_speed() || all_tanks[i].speed_x() || all_tanks[i].speed_y()) && (all_tanks[i].crew_health()) && (all_tanks[i].hull_durability()))
-			EnemiesToAttack.push_back (i);
+		if ((all_tanks[i].id() != self.id()) && (all_tanks[i].crew_health()) && (all_tanks[i].hull_durability()) && (!all_tanks[i].teammate()) && (!(all_tanks[i].player_name() == "EmptyPlayer")) && (!(all_tanks[i].player_name().substr (0,9) == "Akhrameev")))
+			EnemiesToAttack.push_back (all_tanks[i]);
 	}
-	double dist_to_currentenemy = 1E20;
-	if (CurrentEnemy >= 0)
-		dist_to_currentenemy = self.GetDistanceTo (all_tanks[CurrentEnemy]);
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+	///////////////////////////////////////FIRING/////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////////////////////////
+	
+	Tank *enemy = NULL;
+	double measure_enemy = 0;
+	double max_dist_alive_enemy = 0;
+	double max_angle_alive_enemy = 0;
 	for (size_t i = 0; i < EnemiesToAttack.size(); ++i)
 	{
-		if (CurrentEnemy < 0)
+		double dist = self.GetDistanceTo(EnemiesToAttack[i]);
+		double angle = fabs (self.GetTurretAngleTo(EnemiesToAttack[i]));
+		if (dist > max_dist_alive_enemy)
+			max_dist_alive_enemy = dist;
+		if (angle > max_angle_alive_enemy)
+			max_angle_alive_enemy = angle;
+	}
+	if (max_angle_alive_enemy != 0 && max_dist_alive_enemy != 0)
+	{
+		for (size_t i = 0; i < EnemiesToAttack.size(); ++i)
 		{
-			CurrentEnemy = EnemiesToAttack[i];
-			dist_to_currentenemy = self.GetDistanceTo (all_tanks[CurrentEnemy]);
-		}
-		else
-		{
-			double dist = self.GetDistanceTo (all_tanks[EnemiesToAttack[i]]);
-			if (dist < dist_to_currentenemy)
-			{
-				CurrentEnemy = EnemiesToAttack[i];
-				dist_to_currentenemy = dist;
-			}
+			//double measure = MeasureEnemy_ToAtack (&self, &world, &(all_tanks[EnemiesToAttack[i]]));
+			Tank enemy_obj = EnemiesToAttack[i];
 
+			double health_measure = 0;
+			if (enemy_obj.crew_health() != 0)
+				health_measure = 1 - 0.8 * enemy_obj.crew_health() / enemy_obj.crew_max_health();
+			if (enemy_obj.crew_health() <= 25 && enemy_obj.crew_health() > 0)
+				health_measure = 1;
+			double shield_measure = 0;
+			if (enemy_obj.hull_durability() != 0)
+				shield_measure = 1 - 0.8 * enemy_obj.hull_durability() / enemy_obj.hull_max_durability();
+			if (enemy_obj.hull_durability() <= 25 && enemy_obj.hull_durability() > 0)
+				shield_measure = 1;
+			double measure = health_measure * shield_measure * (1 - pow (0.8 * fabs (self.GetTurretAngleTo (enemy_obj)) / max_angle_alive_enemy, 3.7)) * (1 - pow (0.8 * (self.GetDistanceTo (enemy_obj) / max_dist_alive_enemy), 1.9));
+			if (measure > measure_enemy)
+			{
+				enemy = &EnemiesToAttack[i];
+				measure_enemy = measure;
+			}
 		}
 	}
-	//Буду пытаться шматять по противнику
-	if (CurrentEnemy >= 0)
-	{
-		Tank aim = all_tanks[CurrentEnemy];
-		enemy_name = aim.player_name();
-		enemy_id = aim.id();
-		double turret_angle_to = self.GetTurretAngleTo (aim);
-		if (abs (turret_angle_to) >= MIN_FIRING_ANGLE)
-		{	//не буду шмалять, буду крутить пушку
-			double my_tank_angle_to = self.GetAngleTo (aim);
-			if (my_tank_angle_to > 0)
+	if (enemy)
+	{		//определил врага
+		if (self.remaining_reloading_time () / self.reloading_time() <= 0.7)	//UP
+		{
+			double angle = self.GetTurretAngleTo (*enemy);
+			double dist = self.GetDistanceTo (*enemy);
+			if (fabs (angle) <= MIN_FIRING_ANGLE)
 			{
-				move.set_left_track_power (1.0);
-				move.set_right_track_power(-0.5);
+				if (self.remaining_reloading_time() == 0)
+				{
+					if (dist * fabs (sin (angle)) <= enemy->height()/2 && dist <= world.height()/2)
+						move.set_fire_type (PREMIUM_PREFERRED);
+					else
+						move.set_fire_type (REGULAR_FIRE);
+				}
 			}
-			else
-			{
-				move.set_left_track_power (-0.5);
-				move.set_right_track_power(1.0);
-			}
-			if (turret_angle_to > 0)
+			else if (angle >= 0)
 				move.set_turret_turn (self.turret_turn_speed());
 			else
 				move.set_turret_turn (-self.turret_turn_speed());
-		}
-		else
-		{	//постараюсь шмалять
-			if (turret_angle_to > 0)
-				move.set_turret_turn (self.turret_turn_speed());
-			else
-				move.set_turret_turn (-self.turret_turn_speed());
-			if (!self.remaining_reloading_time())
+			/*if ((double (self.remaining_reloading_time()) / self.reloading_time() < 0.05) && (fabs (angle) >= MIN_FIRING_ANGLE))
 			{
-				move.set_fire_type(PREMIUM_PREFERRED);
-			}
+				double right = 1;
+				if (angle < 0)
+					right = -1;
+				move.set_left_track_power  (right);
+				move.set_right_track_power (-right);
+				if (fabs (angle) <= HELP_FIRING_ANGLE)
+					fire_on = true;
+			}*/
 		}
 	}
-	vector <int> shells_to_me;
-	double min_dist_to_shell = 1E20;
-	int closest_shell = -1;
-	double tan_closest = 0;
-	for (size_t i = 0; i < PreviousData_Shells.size(); ++i)
-	{	
-		size_t units_count = PreviousData_Shells[i].units.size();
-		double tan = 0;
-		if (units_count >= 2)
-		{
-			Unit current = PreviousData_Shells[i].units[units_count - 1];
-			Unit last = PreviousData_Shells[i].units[units_count - 1];
-			if (is_aim (last, current, self))
-				tan = line_tan (last, current);
-		}
-		double dist = self.GetDistanceTo (PreviousData_Shells[i].units[units_count - 1]);
-		if (dist < min_dist_to_shell)
-		{
-			closest_shell = i;
-			min_dist_to_shell = dist;
-			tan_closest = tan;
-		}
-	}
-	/*
-	if (closest_shell >= 0)	//попытки уворавиваться от снарядов
-	{
-		Shell current = shells[closest_shell];
-		if (abs (atan (self.GetAngleTo (current)) - atan(-tan_closest)) < MIN_FLEE_ANGLE)
-		{	//пора давать дёру
-			if (self.GetAngleTo (current) > 0)
-			{
-				move.set_left_track_power (-1.0);
-				move.set_right_track_power(-1.0);
-			}
-			else
-			{
-				move.set_left_track_power (1.0);
-				move.set_right_track_power(1.0);
-			}
-		}
-		else
-		{	//необходимо повернуться (если до следующего моего выстрела меньше 5% времени)
-			if (100 * self.remaining_reloading_time() / self.reloading_time() > 5)
-				{
-				double my_tank_angle_to = self.GetAngleTo (current);
-				if (my_tank_angle_to > 0)
-				{
-					move.set_left_track_power (1.0);
-					move.set_right_track_power(-0.5);
-				}
-				else
-				{
-					move.set_left_track_power (-0.5);
-					move.set_right_track_power(1.0);
-				}
-			}
-		}
-	}*/
 
-	Unit *closest_heal = NULL;
-	Unit *closest_armor = NULL;;
-	Unit *closest_turtoise = NULL;
-	vector <Bonus> bonuses = world.bonuses();
+	//////////////////////////////////////////////////////////////////////////////////////////////
+	///////////////////////////////////////MOVING/////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////////////////////////
+
+	if (world.tick() <= self.reloading_time() * 0.8)
+	{
+		double dist_tl = self.GetDistanceTo (0,					0);
+		double dist_tr = self.GetDistanceTo (world.width(),		0);
+		double dist_br = self.GetDistanceTo (world.width(),		world.height());
+		double dist_bl = self.GetDistanceTo (0,					world.height());
+		double dist_cl = self.GetDistanceTo (0,					world.height() / 2);
+		double dist_cr = self.GetDistanceTo (world.width(),		world.height() / 2);
+		double min_dist = min (min (min (dist_tl, dist_tr), min (dist_br, dist_bl)), min (dist_cl, dist_cr));
+		if (min_dist == dist_tl)
+			GoTo (move, self.GetAngleTo (0,					0));
+		else if (min_dist == dist_tr)
+			GoTo (move, self.GetAngleTo (world.width(),		0));
+		else if (min_dist == dist_br)
+			GoTo (move, self.GetAngleTo (world.width(),		world.height()));
+		else if (min_dist == dist_bl)
+			GoTo (move, self.GetAngleTo (0,					world.height()));
+		else if (min_dist == dist_cl)
+			GoTo (move, self.GetAngleTo (0,					world.height() / 2));
+		else if (min_dist == dist_cr)
+			GoTo (move, self.GetAngleTo (world.width(),		world.height() / 2));
+		return;
+	}
+
+	Bonus *goal = NULL;
+	double measure_goal = 0;
+	double measure_health = MeasureSelf_Health(self, world);
+	double measure_shield = MeasureSelf_Shield(self, world);
+	double measure_ammo = MeasureSelf_Ammo(self, world);
+	double max_bonus_dist_health = 0;
+	double max_bonus_dist_shield = 0;
+	double max_bonus_dist_ammo = 0;
 	for (size_t i = 0; i < bonuses.size(); ++i)
 	{
+		double dist = bonuses[i].GetDistanceTo (self);
 		switch (bonuses[i].type())
 		{
 		case MEDIKIT:
 			{
-				double dist = self.GetDistanceTo (bonuses[i]);
-				if (closest_heal && closest_heal->GetDistanceTo (self) > dist)
-				{
-					closest_heal = &bonuses[i];
-				}
-				else
-					closest_heal = &bonuses[i];
-				break;
-			}
-		case AMMO_CRATE:
-			{
-				double dist = self.GetDistanceTo (bonuses[i]);
-				if (closest_armor && closest_armor->GetDistanceTo (self) > dist)
-				{
-					closest_armor = &bonuses[i];
-				}
-				else
-					closest_armor = &bonuses[i];
+				
+				if (dist > max_bonus_dist_health)
+					max_bonus_dist_health = dist;
 				break;
 			}
 		case REPAIR_KIT:
 			{
-				double dist = self.GetDistanceTo (bonuses[i]);
-				if (closest_turtoise && closest_turtoise->GetDistanceTo (self) > dist)
-				{
-					closest_turtoise = &bonuses[i];
-				}
-				else
-					closest_turtoise = &bonuses[i];
+				if (dist > max_bonus_dist_shield)
+					max_bonus_dist_shield = dist;
+				break;
+			}
+		case AMMO_CRATE:
+			{
+				if (dist > max_bonus_dist_ammo)
+					max_bonus_dist_ammo = dist;
 				break;
 			}
 		default:
-			break;
+			{
+				dist = 0;
+				break;
+			}
 		}
 	}
-
-	if (100 * self.remaining_reloading_time() / self.reloading_time() > 20)
+	for (size_t i = 0; i < bonuses.size(); ++i)
 	{
-		if (closest_heal && (100 * self.crew_health() / self.crew_max_health() < 50))
+		double measure = 0;
+		switch (bonuses[i].type())
 		{
-			double angle_to_bonus = self.GetAngleTo (*closest_heal);
-			if (angle_to_bonus > MIN_ANGLE) 
-			{         // ���� ���� ������ �������������,
-				move.set_left_track_power(0.75);      // �� ����� ���������������,
-				move.set_right_track_power(-1.0);        // �������� ��������������� ���� ���������.
-			} 
-			else if (angle_to_bonus < -MIN_ANGLE) 
-			{  // ���� ���� ������ �������������,
-				move.set_left_track_power(-1.0);         // ����� ���������������
-				move.set_right_track_power(0.75);     // � ��������������� �������.
-			} 
-			else 
+		case MEDIKIT:
 			{
-				move.set_left_track_power(1.0);         // ���� ���� �� ������ 30 ��������
-				move.set_right_track_power(1.0);        // ������ ����������� ������ ������ 
+				if (max_bonus_dist_health)
+					measure = measure_health * (1 - pow (0.8 * bonuses[i].GetDistanceTo (self) / max_bonus_dist_health, 2.3));
+				break;
+			}
+		case REPAIR_KIT:
+			{
+				if (max_bonus_dist_shield)
+					measure = measure_shield * (1 - pow (0.8 * bonuses[i].GetDistanceTo (self) / max_bonus_dist_shield, 1.5));
+				break;
+			}
+		case AMMO_CRATE:
+			{
+				if (max_bonus_dist_ammo)
+					measure = measure_ammo * (1 - pow (0.8 * bonuses[i].GetDistanceTo (self) / max_bonus_dist_ammo, 0.4));
+				break;
+			}
+		default:
+			{
+				measure = 0;
+				break;
 			}
 		}
-		else if (closest_turtoise && (100 * self.hull_durability() / self.hull_max_durability() < 30))
+		if (measure > measure_goal)
 		{
-			double angle_to_bonus = self.GetAngleTo (*closest_turtoise);
-			if (angle_to_bonus > MIN_ANGLE) 
-			{         // ���� ���� ������ �������������,
-				move.set_left_track_power(0.75);      // �� ����� ���������������,
-				move.set_right_track_power(-1.0);        // �������� ��������������� ���� ���������.
-			} 
-			else if (angle_to_bonus < -MIN_ANGLE) 
-			{  // ���� ���� ������ �������������,
-				move.set_left_track_power(-1.0);         // ����� ���������������
-				move.set_right_track_power(0.75);     // � ��������������� �������.
-			} 
-			else 
-			{
-				move.set_left_track_power(1.0);         // ���� ���� �� ������ 30 ��������
-				move.set_right_track_power(1.0);        // ������ ����������� ������ ������ 
-			}
-		}
-		else if (closest_armor)
-		{
-			double angle_to_bonus = self.GetAngleTo (*closest_armor);
-			if (angle_to_bonus > MIN_ANGLE) 
-			{         // ���� ���� ������ �������������,
-				move.set_left_track_power(0.75);      // �� ����� ���������������,
-				move.set_right_track_power(-1.0);        // �������� ��������������� ���� ���������.
-			} 
-			else if (angle_to_bonus < -MIN_ANGLE) 
-			{  // ���� ���� ������ �������������,
-				move.set_left_track_power(-1.0);         // ����� ���������������
-				move.set_right_track_power(0.75);     // � ��������������� �������.
-			} 
-			else 
-			{
-				move.set_left_track_power(1.0);         // ���� ���� �� ������ 30 ��������
-				move.set_right_track_power(1.0);        // ������ ����������� ������ ������ 
-			}
+			goal = &bonuses[i];
+			measure_goal = measure;
 		}
 	}
+	if (goal && measure_health >= 0.5 || measure_shield >= 0.4)
+	{
+		GoTo (move, self.GetAngleTo (*goal));
+		return;
+	}
 
-	/*
-	vector<Tank> all_tanks = world.tanks();             // ������� ������ ���� �������
-    double min_dist_to_bonus = 1E20;
-    size_t selected_bonus = all_tanks.size();
-    for(size_t i = 0; i < all_tanks.size(); ++i) {         // ���������� ����� �� ������
-       Tank bonus = all_tanks[i];
-       double dist_to_bonus = self.GetDistanceTo(bonus);    // ������ ���������� �� ������
-	   if ((dist_to_bonus > 0 ) && (bonus.crew_health() > 0) && (bonus.speed_x() || bonus.speed_y() )) {             // ������ ���������
-         min_dist_to_bonus = dist_to_bonus;
-         selected_bonus = i;
-       }
-    }
-
-    if (selected_bonus != all_tanks.size()) {
-       double angle_to_bonus = self.GetAngleTo(all_tanks[selected_bonus]); // ������ ���� �� ������
-
-       if (angle_to_bonus > MIN_ANGLE) {         // ���� ���� ������ �������������,
-         move.set_left_track_power(0.75);      // �� ����� ���������������,
-         move.set_right_track_power(-1.0);        // �������� ��������������� ���� ���������.
-       } else if (angle_to_bonus < -MIN_ANGLE) {  // ���� ���� ������ �������������,
-         move.set_left_track_power(-1.0);         // ����� ���������������
-         move.set_right_track_power(0.75);     // � ��������������� �������.
-       } else {
-         move.set_left_track_power(1.0);         // ���� ���� �� ������ 30 ��������
-         move.set_right_track_power(1.0);        // ������ ����������� ������ ������ 
-       }
-    }
-	    if (selected_bonus != all_tanks.size()) {
-       double angle_to_bonus = self.GetTurretAngleTo(all_tanks[selected_bonus]); // ������ ���� �� ������
-
-	   if (angle_to_bonus) {         // ���� ���� ������ �������������,
-		   move.set_turret_turn (-all_tanks[my_tank_index].turret_turn_speed());
-	   }
-	   else
-	   {
-		   move.set_turret_turn (-all_tanks[my_tank_index].turret_turn_speed());
-	   }
-    }*/
+	if (goal)
+	{
+		Shell *danger = NULL;
+		double danger_measure = 0;
+		double max_dist_shells = 0;
+		double max_angle_shells = 0;
+		for (size_t i = 0; i < shells.size(); ++i)
+		{
+			double dist = shells[i].GetDistanceTo(self);
+			double angle = fabs(shells[i].GetAngleTo (self));
+			if (angle <= M_PI/2 && angle > max_angle_shells)
+				max_angle_shells = angle;
+			if (dist > max_dist_shells)
+				max_dist_shells = dist;
+		}
+		if (max_angle_shells && max_dist_shells)
+		{
+			for (size_t i = 0; i < shells.size(); ++i)
+			{
+				double measure = 0;
+				//MeasureShell_Defend (&self, &world, &shells[i]);
+				double dist = shells[i].GetDistanceTo(self);
+				double angle = fabs(shells[i].GetAngleTo (self));
+				if (angle >= M_PI/2)
+					measure = 0;
+				else if (dist * sin(angle) <= self.width()/2)
+					measure = 1;
+				else if (dist * sin(angle) <= self.height())
+					measure = 0.9;
+				else
+					measure = 0.9 * (1 - pow (0.8 * dist / max_dist_shells, 0.9)) * (1 - pow (0.8 * angle / max_angle_shells, 0.4));
+				if (measure > danger_measure)
+				{
+					danger = &shells[i];
+					danger_measure = measure;
+				}
+			}
+		}
+		if (danger && danger_measure >= MIN_DANGER_LEVEL)
+			GoFrom (move, self.GetAngleTo (*danger), self.GetAngleTo (*goal));
+		else
+			GoTo (move, self.GetAngleTo (*goal));
+	}
 }
 
 TankType MyStrategy::SelectTank(int tank_index, int team_size) {
