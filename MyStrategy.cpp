@@ -352,13 +352,15 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 		{
 			move.set_turret_turn (-self.turret_turn_speed());
 		}
-		if ((double (self.remaining_reloading_time()) / self.reloading_time() < 0.05) && (abs (angle) <= HELP_FIRING_ANGLE) && (abs (angle) >= MIN_FIRING_ANGLE))
+		if ((double (self.remaining_reloading_time()) / self.reloading_time() < 0.05) && (abs (angle) >= MIN_FIRING_ANGLE))
 		{
 			double right = 1;
 			if (angle < 0)
 				right = -1;
 			move.set_left_track_power  (right);
 			move.set_right_track_power (-right);
+			if (abs (angle) <= HELP_FIRING_ANGLE)
+				fire_on = true;
 		}
 	}
 
