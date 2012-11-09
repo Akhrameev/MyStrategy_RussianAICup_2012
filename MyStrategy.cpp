@@ -114,55 +114,55 @@ pair <double, double> Closest_Corner (World &world, Tank &self)
 	pair <double, double> goal;
 	double x = self.x();
 	double y = self.y();
-	if (x <= h/4 && y <= w/3)
+	if (x <= w/4 && y <= h/3)
 	{
-		goal.first = h/4;
+		goal.first = w/4;
 		goal.second = self.height()/2;
 	}
-	else if (x <= h/2 && y <= w/3)
+	else if (x <= w/2 && y <= h/3)
 	{
-		goal.first = h/2;
+		goal.first = w/2;
 		goal.second = self.height()/2;
 	}
-	else if (x <= 3*h/4 && y <= w/3)
+	else if (x <= 3*w/4 && y <= h/3)
 	{
-		goal.first = 3*h/4;
+		goal.first = 3*w/4;
 		goal.second = self.height()/2;
 	}
-	else if (y <= w/3)
+	else if (y <= h/3)
 	{
-		goal.first = h - self.height()/2;
-		goal.second = w/3;
+		goal.first = w - self.height()/2;
+		goal.second = h/3;
 	}
-	else if (x <= h/2 && y <= 2*w/3)
+	else if (x <= w/2 && y <= 2*h/3)
 	{
 		goal.first = self.height()/2;
-		goal.second = w/3;
+		goal.second = h/3;
 	}
-	else if (y <= 2*w/3)
+	else if (y <= 2*h/3)
 	{
-		goal.first = h - self.height()/2;
-		goal.second = 2*w/3;
+		goal.first = w - self.height()/2;
+		goal.second = 2*h/3;
 	}
-	else if (x <= h/4)
+	else if (x <= w/4)
 	{
 		goal.first = self.height()/2;
-		goal.second = 2*w/3;
+		goal.second = 2*h/3;
 	}
-	else if (x <= h/2)
+	else if (x <= w/2)
 	{
-		goal.first = h/4;
-		goal.second = w - self.height()/2;
+		goal.first = w/4;
+		goal.second = h - self.height()/2;
 	}
-	else if (x <= 3*h/4)
+	else if (x <= 3*w/4)
 	{
-		goal.first = h/2;
-		goal.second = w - self.height()/2;
+		goal.first = w/2;
+		goal.second = h - self.height()/2;
 	}
 	else
 	{
-		goal.first = 3*h/3;
-		goal.second = w - self.height()/2;
+		goal.first = 3*w/3;
+		goal.second = h - self.height()/2;
 	}
 	return goal;
 }
