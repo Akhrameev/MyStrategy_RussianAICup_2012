@@ -8,7 +8,6 @@
 using namespace model;
 using namespace std;
 
-int my_tank_index = 0;
 int CurrentEnemy = 0;
 std::string enemy_name = "";
 long enemy_id = -1;
@@ -35,7 +34,7 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 		CurrentEnemy = -1;
 	for (size_t i = 0; i < all_tanks.size(); ++i)
 	{
-		if ((i != my_tank_index) && (all_tanks[i].angular_speed() || all_tanks[i].speed_x() || all_tanks[i].speed_y()) && (all_tanks[i].crew_health()))
+		if ((all_tanks[i].id() != self.id()) && (all_tanks[i].angular_speed() || all_tanks[i].speed_x() || all_tanks[i].speed_y()) && (all_tanks[i].crew_health()))
 			EnemiesToAttack.push_back (i);
 	}
 	double dist_to_currentenemy = 1E20;
@@ -66,30 +65,38 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 		double turret_angle_to = self.GetTurretAngleTo (aim);
 		if (abs (turret_angle_to) >= MIN_FIRING_ANGLE)
 		{	//не буду шмалять, буду крутить пушку
-			if (self.turret_max_relative_angle())
-			{	//если могу крутить пушку
-				if (turret_angle_to > 0)
-					move.set_turret_turn (self.turret_turn_speed());
-				else
-					move.set_turret_turn (-self.turret_turn_speed());
+			//if (self.turret_max_relative_angle())
+			//{	//если могу крутить пушку
+			//	if (turret_angle_to > 0)
+			//		move.set_turret_turn (self.turret_turn_speed());
+			//	else
+			//		move.set_turret_turn (-self.turret_turn_speed());
+			//}
+			//else
+			//{	
+			//иначе буду крутить танк
+			double my_tank_angle_to = self.GetAngleTo (aim);
+			if (my_tank_angle_to > 0)
+			{
+				move.set_left_track_power (1.0);
+				move.set_right_track_power(-1.0);
 			}
 			else
-			{	//иначе буду крутить танк
-				double my_tank_angle_to = self.GetAngleTo (aim);
-				if (my_tank_angle_to > 0)
-				{
-					move.set_left_track_power (1.0);
-					move.set_right_track_power(-1.0);
-				}
-				else
-				{
-					move.set_left_track_power (-1.0);
-					move.set_right_track_power(1.0);
-				}
+			{
+				move.set_left_track_power (-1.0);
+				move.set_right_track_power(1.0);
 			}
+			if (turret_angle_to > 0)
+				move.set_turret_turn (self.turret_turn_speed());
+			else
+				move.set_turret_turn (-self.turret_turn_speed());
 		}
 		else
 		{	//постараюсь шмалять
+			if (turret_angle_to > 0)
+				move.set_turret_turn (self.turret_turn_speed());
+			else
+				move.set_turret_turn (-self.turret_turn_speed());
 			if (!self.remaining_reloading_time())
 			{
 				move.set_fire_type(PREMIUM_PREFERRED);
@@ -113,7 +120,7 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 			}
 		}
 	}
-	if (closest_shell >= 0)
+	/*if (closest_shell >= 0)	//попытки уворавиваться от снарядов
 	{
 		if (min_dist_to_shell < self.width() + self.height())
 		{	//попробую уехать так, чтобы в меня не попал заряд
@@ -129,7 +136,7 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 				move.set_right_track_power(1.0);
 			}
 		}
-	}
+	}*/
 	/*
 	vector<Tank> all_tanks = world.tanks();             // ������� ������ ���� �������
     double min_dist_to_bonus = 1E20;
@@ -171,6 +178,5 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 }
 
 TankType MyStrategy::SelectTank(int tank_index, int team_size) {
-	my_tank_index = tank_index;
-    return HEAVY;
+    return TANK_DESTROYER;
 }
