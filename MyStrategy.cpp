@@ -16,7 +16,7 @@ double min_angle_alive = M_PI;	//>M_PI
 const double MIN_ANGLE = M_PI / 6.0; 
 const double MIN_GOTO_ANGLE = M_PI / 12.0;
 const double MIN_FIRING_ANGLE = M_PI / 180.0;
-const double MIN_DANGER_LEVEL = 0.55;
+const double MIN_DANGER_LEVEL = 0.7;
 
 bool GoTo (model::Move& move, double angle)
 {
@@ -316,6 +316,40 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 	double measure_health = MeasureSelf_Health(&self, &world);
 	double measure_shield = MeasureSelf_Shield(&self, &world);
 	double measure_ammo = MeasureSelf_Ammo(&self, &world);
+	double max_bonus_dist_health = 0;
+	double max_bonus_dist_shield = 0;
+	double max_bonus_dist_ammo = 0;
+	for (size_t i = 0; i < bonuses.size(); ++i)
+	{
+		double dist = bonuses[i].GetDistanceTo (self);
+		switch (bonuses[i].type())
+		{
+		case MEDIKIT:
+			{
+				
+				if (dist > max_bonus_dist_health)
+					max_bonus_dist_health = dist;
+				break;
+			}
+		case REPAIR_KIT:
+			{
+				if (dist > max_bonus_dist_shield)
+					max_bonus_dist_shield = dist;
+				break;
+			}
+		case AMMO_CRATE:
+			{
+				if (dist > max_bonus_dist_ammo)
+					max_bonus_dist_ammo = dist;
+				break;
+			}
+		default:
+			{
+				dist = 0;
+				break;
+			}
+		}
+	}
 	for (size_t i = 0; i < bonuses.size(); ++i)
 	{
 		double measure = 0;
@@ -323,17 +357,17 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 		{
 		case MEDIKIT:
 			{
-				measure = measure_health * pow (bonuses[i].GetDistanceTo (self), 0.3);
+				measure = measure_health * pow (max_bonus_dist_health / bonuses[i].GetDistanceTo (self), 1.7);
 				break;
 			}
 		case REPAIR_KIT:
 			{
-				measure = measure_shield * pow (bonuses[i].GetDistanceTo (self), 0.3);
+				measure = measure_shield * pow (max_bonus_dist_shield / bonuses[i].GetDistanceTo (self), 1.5);
 				break;
 			}
 		case AMMO_CRATE:
 			{
-				measure = measure_ammo * pow (bonuses[i].GetDistanceTo (self), 0.3);
+				measure = measure_ammo * pow (max_bonus_dist_ammo / bonuses[i].GetDistanceTo (self), 1.1);
 				break;
 			}
 		default:
