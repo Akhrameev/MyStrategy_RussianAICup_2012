@@ -1,56 +1,176 @@
-#include "MyStrategy.h"
+п»ї#include "MyStrategy.h"
 
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <vector>
+#include <string>
 
 using namespace model;
 using namespace std;
 
-const double MIN_ANGLE = M_PI / 6.0; // угол в 30 градусов
-const double MAX_ANGLE = M_PI /*/ 6.0*/; // угол в 180 градусов
+int my_tank_index = 0;
+int CurrentEnemy = 0;
+std::string enemy_name = "";
+long enemy_id = -1;
 
-void MyStrategy::Move(Tank self, World world, model::Move& move) {
-	move.set_fire_type(PREMIUM_PREFERRED);
-	vector<Tank> all_tanks = world.tanks();             // получим список всех бонусов
+const double MIN_ANGLE = M_PI / 6.0; 
+const double MAX_ANGLE = M_PI; 
+const double MIN_FIRING_ANGLE = M_PI / 36.0; 
+
+void MyStrategy::Move(Tank self, World world, model::Move& move) 
+{
+	move.set_fire_type(NONE);
+	vector <Tank> all_tanks = world.tanks();
+	vector <int> EnemiesToAttack;
+	CurrentEnemy = -1;
+	for (size_t i = 0; i < all_tanks.size(); ++i)
+		if (all_tanks[i].player_name() == enemy_name)
+		{
+			if ((CurrentEnemy < 0) && (all_tanks[i].id() == enemy_id))
+				CurrentEnemy = i;
+			if (CurrentEnemy < 0)
+				CurrentEnemy = i;
+		}
+	if (CurrentEnemy >= 0 && !all_tanks[CurrentEnemy].crew_health())
+		CurrentEnemy = -1;
+	for (size_t i = 0; i < all_tanks.size(); ++i)
+	{
+		if ((i != my_tank_index) && (all_tanks[i].angular_speed() || all_tanks[i].speed_x() || all_tanks[i].speed_y()) && (all_tanks[i].crew_health()))
+			EnemiesToAttack.push_back (i);
+	}
+	double dist_to_currentenemy = 1E20;
+	if (CurrentEnemy >= 0)
+		dist_to_currentenemy = self.GetDistanceTo (all_tanks[CurrentEnemy]);
+	for (size_t i = 0; i < EnemiesToAttack.size(); ++i)
+	{
+		if (CurrentEnemy < 0)
+		{
+			CurrentEnemy = EnemiesToAttack[i];
+			dist_to_currentenemy = self.GetDistanceTo (all_tanks[CurrentEnemy]);
+		}
+		else
+		{
+			double dist = self.GetDistanceTo (all_tanks[EnemiesToAttack[i]]);
+			if (dist < dist_to_currentenemy)
+			{
+				CurrentEnemy = EnemiesToAttack[i];
+				dist_to_currentenemy = dist;
+			}
+
+		}
+	}
+	//Р‘СѓРґСѓ РїС‹С‚Р°С‚СЊСЃСЏ С€РјР°С‚СЏС‚СЊ РїРѕ РїСЂРѕС‚РёРІРЅРёРєСѓ
+	if (CurrentEnemy >= 0)
+	{
+		Tank aim = all_tanks[CurrentEnemy];
+		double turret_angle_to = self.GetTurretAngleTo (aim);
+		if (abs (turret_angle_to) >= MIN_FIRING_ANGLE)
+		{	//РЅРµ Р±СѓРґСѓ С€РјР°Р»СЏС‚СЊ, Р±СѓРґСѓ РєСЂСѓС‚РёС‚СЊ РїСѓС€РєСѓ
+			if (self.turret_max_relative_angle())
+			{	//РµСЃР»Рё РјРѕРіСѓ РєСЂСѓС‚РёС‚СЊ РїСѓС€РєСѓ
+				if (turret_angle_to > 0)
+					move.set_turret_turn (self.turret_turn_speed());
+				else
+					move.set_turret_turn (-self.turret_turn_speed());
+			}
+			else
+			{	//РёРЅР°С‡Рµ Р±СѓРґСѓ РєСЂСѓС‚РёС‚СЊ С‚Р°РЅРє
+				double my_tank_angle_to = self.GetAngleTo (aim);
+				if (my_tank_angle_to > 0)
+				{
+					move.set_left_track_power (1.0);
+					move.set_right_track_power(-1.0);
+				}
+				else
+				{
+					move.set_left_track_power (-1.0);
+					move.set_right_track_power(1.0);
+				}
+			}
+		}
+		else
+		{	//РїРѕСЃС‚Р°СЂР°СЋСЃСЊ С€РјР°Р»СЏС‚СЊ
+			if (!self.remaining_reloading_time())
+			{
+				move.set_fire_type(PREMIUM_PREFERRED);
+			}
+		}
+	}
+	vector <Shell> shells = world.shells();
+	vector <int> shells_to_me;
+	double min_dist_to_shell = 1E20;
+	int closest_shell = -1;
+	for (size_t i = 0; i < shells.size(); ++i)
+	{
+		std::string my_name = self.player_name();
+		if (shells[i].player_name() != my_name)
+		{
+			double dist = self.GetDistanceTo (shells[i]);
+			if (dist < min_dist_to_shell)
+			{
+				closest_shell = i;
+				min_dist_to_shell = dist;
+			}
+		}
+	}
+	if (closest_shell >= 0)
+	{
+		if (min_dist_to_shell < self.width() + self.height())
+		{	//РїРѕРїСЂРѕР±СѓСЋ СѓРµС…Р°С‚СЊ С‚Р°Рє, С‡С‚РѕР±С‹ РІ РјРµРЅСЏ РЅРµ РїРѕРїР°Р» Р·Р°СЂСЏРґ
+			double my_tank_angle_to = self.GetAngleTo (shells[closest_shell]);
+			if (my_tank_angle_to > 0)
+			{
+				move.set_left_track_power (-1.0);
+				move.set_right_track_power(-1.0);
+			}
+			else
+			{
+				move.set_left_track_power (1.0);
+				move.set_right_track_power(1.0);
+			}
+		}
+	}
+	/*
+	vector<Tank> all_tanks = world.tanks();             // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
     double min_dist_to_bonus = 1E20;
     size_t selected_bonus = all_tanks.size();
-    for(size_t i = 0; i < all_tanks.size(); ++i) {         // перебираем бонус из списка
+    for(size_t i = 0; i < all_tanks.size(); ++i) {         // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
        Tank bonus = all_tanks[i];
-       double dist_to_bonus = self.GetDistanceTo(bonus);    // найдем расстояние до бонуса
-	   if ((dist_to_bonus > 0 ) /*&& (dist_to_bonus < min_dist_to_bonus)*/ && (bonus.crew_health() > 0) && (bonus.speed_x() || bonus.speed_y() )) {             // найдем ближайший
+       double dist_to_bonus = self.GetDistanceTo(bonus);    // пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
+	   if ((dist_to_bonus > 0 ) && (bonus.crew_health() > 0) && (bonus.speed_x() || bonus.speed_y() )) {             // пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
          min_dist_to_bonus = dist_to_bonus;
          selected_bonus = i;
        }
     }
 
     if (selected_bonus != all_tanks.size()) {
-       double angle_to_bonus = self.GetAngleTo(all_tanks[selected_bonus]); // найдем угол до бонуса
+       double angle_to_bonus = self.GetAngleTo(all_tanks[selected_bonus]); // пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
 
-       if (angle_to_bonus > MIN_ANGLE) {         // если угол сильно положительный,
-         move.set_left_track_power(0.75);      // то будем разворачиваться,
-         move.set_right_track_power(-1.0);        // поставив противоположные силы гусеницам.
-       } else if (angle_to_bonus < -MIN_ANGLE) {  // если угол сильно отрицательный,
-         move.set_left_track_power(-1.0);         // будем разворачиваться
-         move.set_right_track_power(0.75);     // в противоположную сторону.
+       if (angle_to_bonus > MIN_ANGLE) {         // пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ,
+         move.set_left_track_power(0.75);      // пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ,
+         move.set_right_track_power(-1.0);        // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.
+       } else if (angle_to_bonus < -MIN_ANGLE) {  // пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ,
+         move.set_left_track_power(-1.0);         // пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+         move.set_right_track_power(0.75);     // пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ.
        } else {
-         move.set_left_track_power(1.0);         // если угол не больше 30 градусов
-         move.set_right_track_power(1.0);        // поедем максимально быстро вперед 
+         move.set_left_track_power(1.0);         // пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ 30 пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+         move.set_right_track_power(1.0);        // пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ 
        }
     }
 	    if (selected_bonus != all_tanks.size()) {
-       double angle_to_bonus = self.GetAngleTo(all_tanks[selected_bonus]); // найдем угол до бонуса
+       double angle_to_bonus = self.GetTurretAngleTo(all_tanks[selected_bonus]); // пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
 
-       if (angle_to_bonus < MAX_ANGLE) {         // если угол сильно положительный,
-		   move.set_turret_turn (-angle_to_bonus);
+	   if (angle_to_bonus) {         // пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ,
+		   move.set_turret_turn (-all_tanks[my_tank_index].turret_turn_speed());
 	   }
 	   else
 	   {
-		   move.set_turret_turn (angle_to_bonus);
+		   move.set_turret_turn (-all_tanks[my_tank_index].turret_turn_speed());
 	   }
-    }
+    }*/
 }
 
 TankType MyStrategy::SelectTank(int tank_index, int team_size) {
+	my_tank_index = tank_index;
     return HEAVY;
 }
