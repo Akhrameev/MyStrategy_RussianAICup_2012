@@ -6,12 +6,12 @@
 #include <string>
 #include <cstdlib>
 #include <ctime>
+#include <stdexcept>
+#include <iostream>
 
 using namespace model;
 using namespace std;
 
-const double MIN_ANGLE = M_PI / 6.0; 
-const double MIN_GOTO_ANGLE = M_PI / 12.0;
 const double MIN_FIRING_ANGLE = M_PI / 90.0;
 const double MIN_DANGER_LEVEL = 0.8;
 
@@ -104,7 +104,8 @@ double MeasureSelf_Ammo (Tank &self, World &world)
 
 void MyStrategy::Move(Tank self, World world, model::Move& move) 
 {
-	vector <Tank> all_tanks = world.tanks();
+	try {
+    vector <Tank> all_tanks = world.tanks();
 	vector <Shell> shells = world.shells();
 	vector <Bonus> bonuses = world.bonuses();
 	move.set_fire_type(NONE);
@@ -112,15 +113,13 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 	//заполнение массива живых врагов.
 	for (size_t i = 0; i < all_tanks.size(); ++i)
 	{
-		if ((all_tanks[i].id() != self.id()) && (all_tanks[i].crew_health() > 0) && (all_tanks[i].hull_durability() > 0) && (!all_tanks[i].teammate()) && (!(all_tanks[i].player_name() == "EmptyPlayer")) && (!(all_tanks[i].player_name().substr (0,9) == "Akhrameev")))
+		if ((all_tanks[i].id() != self.id()) && (all_tanks[i].crew_health() > 0) && (all_tanks[i].hull_durability() > 0) && (!all_tanks[i].teammate()) && (!(all_tanks[i].player_name() == "EmptyPlayer")) /*&& (!(all_tanks[i].player_name().substr (0,9) == "Akhrameev"))*/)
 			EnemiesToAttack.push_back (all_tanks[i]);
 	}
-
 	//////////////////////////////////////////////////////////////////////////////////////////////
 	///////////////////////////////////////FIRING/////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////////////////
-	/*
-	//Tank *enemy = NULL;
+	
 	size_t tank_num_in_enemies_array = EnemiesToAttack.size();
 	double measure_enemy = 0;
 	double max_dist_alive_enemy = 0;
@@ -156,16 +155,15 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 				continue;
 			if (measure > measure_enemy)
 			{
-				//enemy = &EnemiesToAttack[i];
 				tank_num_in_enemies_array = i;
 				measure_enemy = measure;
 			}
 		}
 	}
-	if (tank_num_in_enemies_array != EnemiesToAttack.size())
+	if (tank_num_in_enemies_array < EnemiesToAttack.size())
 	{		//определил врага
-		Tank enemy_object = EnemiesToAttack[tank_num_in_enemies_array];//*enemy;
-		if (self.remaining_reloading_time () / self.reloading_time() <= 0.7)	//UP
+		Tank enemy_object = EnemiesToAttack[tank_num_in_enemies_array];
+		if (self.remaining_reloading_time () / self.reloading_time() <= 0.7)
 		{
 			double angle = self.GetTurretAngleTo (enemy_object);
 			double dist = self.GetDistanceTo (enemy_object);
@@ -194,7 +192,7 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 			//		fire_on = true;
 			//}
 		}
-	}*/
+	}
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 	///////////////////////////////////////MOVING/////////////////////////////////////////////////
@@ -224,7 +222,6 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 		return;
 	}
 
-	//Bonus *goal = NULL;
 	size_t goal_num_in_bonuses_array = bonuses.size();
 	double measure_goal = 0;
 	double measure_health = MeasureSelf_Health(self, world);
@@ -295,23 +292,20 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 		}
 		if (measure > measure_goal)
 		{
-			//goal = &bonuses[i];
 			goal_num_in_bonuses_array = i;
 			measure_goal = measure;
 		}
 	}
-	if (/*goal && */goal_num_in_bonuses_array < bonuses.size() && measure_health >= 0.5 || measure_shield >= 0.4)
+	if (goal_num_in_bonuses_array < bonuses.size() && (measure_health >= 0.5 || measure_shield >= 0.4))
 	{
 		Bonus bonus_goal = bonuses[goal_num_in_bonuses_array];
 		GoTo (move, self.GetAngleTo (bonus_goal));
 		return;
 	}
 
-	if (/*goal && */goal_num_in_bonuses_array < bonuses.size())
+	if (goal_num_in_bonuses_array < bonuses.size())
 	{
-		Bonus goal_object = bonuses[goal_num_in_bonuses_array];//*goal;
-		//Shell *danger = NULL;
-		size_t danger_num_in_danger_array = shells.size();
+		Bonus goal_object = bonuses[goal_num_in_bonuses_array];
 		double danger_measure = 0;
 		double max_dist_shells = 0;
 		double max_angle_shells = 0;
@@ -328,14 +322,15 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 				max_dist_shells = dist;
 			shells_danger.push_back(shells[i]);
 		}
+		size_t danger_num_in_danger_array = shells_danger.size();
 		if (max_angle_shells && max_dist_shells)
 		{
 			for (size_t i = 0; i < shells_danger.size(); ++i)
 			{
 				double measure = 0;
 				//MeasureShell_Defend (&self, &world, &shells[i]);
-				double dist = shells[i].GetDistanceTo(self);
-				double angle = fabs(shells[i].GetAngleTo (self));
+				double dist = shells_danger[i].GetDistanceTo(self);
+				double angle = fabs(shells_danger[i].GetAngleTo (self));
 				if (angle >= M_PI/2)
 					measure = 0;
 				else if (dist * sin(angle) <= self.width()/2)
@@ -346,16 +341,23 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 					measure = 0.9 * (1 - pow (0.8 * dist / max_dist_shells, 0.9)) * (1 - pow (0.8 * angle / max_angle_shells, 0.4));
 				if (measure > danger_measure)
 				{
-					//danger = &shells[i];
 					danger_num_in_danger_array = i;
 					danger_measure = measure;
 				}
 			}
 		}
-		if (/*danger && */danger_num_in_danger_array < shells.size() && danger_measure >= MIN_DANGER_LEVEL)
-			GoFrom (move, self.GetAngleTo (shells[danger_num_in_danger_array]/**danger*/), self.GetAngleTo (goal_object));
+		if (danger_num_in_danger_array < shells_danger.size() && danger_measure >= MIN_DANGER_LEVEL)
+			GoFrom (move, self.GetAngleTo (shells_danger[danger_num_in_danger_array]), self.GetAngleTo (goal_object));
 		else
 			GoTo (move, self.GetAngleTo (goal_object));
+	}
+	}
+	catch (out_of_range& oor) {
+		cerr << "Out of Range error: " << oor.what() << endl;
+	}
+	catch (...)
+	{
+		cerr << "tratata" << endl;
 	}
 }
 
