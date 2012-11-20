@@ -108,7 +108,7 @@ pair <double, double> Boundry_Angle (Unit &self, Unit &target)
 }
 
 pair <double, double> Closest_Corner (World &world, Tank &self)
-{
+{	//движение по полю примерно по часовой стрелке. Поле делится на 12 областей, для каждой из них задана точка движения.
 	double h = world.height();
 	double w = world.width();
 	pair <double, double> goal;
@@ -383,6 +383,12 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 	}
 	for (size_t i = 0; i < bonuses.size(); ++i)
 		Barrier.push_back (bonuses[i]);
+	vector <Obstacle> all_obstacles = world.obstacles();
+	for (size_t i = 0; i < all_obstacles.size(); ++i)
+		Barrier.push_back (all_obstacles[i]);
+	for (size_t i = 0 ; i < all_tanks.size(); ++i)
+		if (all_tanks [i].teammate() && all_tanks[i].id() != self.id())
+			Barrier.push_back (all_tanks[i]);
 
 	//for (size_t i = 0; i < shells.size(); ++i)
 	//	for (size_t j = i + 1; j < shells.size(); ++j)
@@ -484,6 +490,21 @@ void MyStrategy::Move(Tank self, World world, model::Move& move)
 									//бонус или что-то другое полностью закрывает врага
 									barriers += Barrier.size();
 									break;
+								}
+								for (size_t i = 0; i < all_tanks.size(); ++i)
+								{
+									if (all_tanks[i].id() == self.id())
+										continue;
+									pair <double, double> tank_boundry = Boundry_Angle (self, all_tanks[i]);
+									if (Cover_Angle (tank_boundry, enemy_boundry))
+									{
+										//танк полностью закрывает врага - проверим, свой ли и жив ли он
+										if (all_tanks[i].crew_health() > 0 && all_tanks[i].hull_durability() > 0 && !all_tanks[i].teammate())
+											++barriers;
+										else
+											barriers += Barrier.size();
+										break;
+									}
 								}
 								if (Intersection_Angle (barrier_boundry, enemy_boundry))
 									++barriers;
